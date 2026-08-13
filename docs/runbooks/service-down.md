@@ -20,7 +20,7 @@ Check whether the service is active:
 
 Run the application health check:
 
-    /home/ubuntu/reliability-web/check-health.sh
+    sudo -u reliability-web /opt/reliability-web/check-health.sh
 
 Check whether port 8080 is listening:
 
@@ -66,7 +66,7 @@ Confirm that the service is active:
 
 Run the health check:
 
-    /home/ubuntu/reliability-web/check-health.sh
+    sudo -u reliability-web /opt/reliability-web/check-health.sh
 
 Verify the HTTP response:
 

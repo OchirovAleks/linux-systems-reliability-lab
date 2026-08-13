@@ -1,9 +1,13 @@
 [Unit]
 Description=Check reliability web service health
-After=network.target reliability-web.service
+After=network-online.target reliability-web.service
 
 [Service]
 Type=oneshot
-User=ubuntu
-Group=ubuntu
-ExecStart=/home/ubuntu/reliability-web/check-health.sh
+User=reliability-web
+Group=reliability-web
+ExecStart=/opt/reliability-web/check-health.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

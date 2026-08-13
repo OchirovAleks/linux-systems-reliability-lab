@@ -18,12 +18,31 @@ reliability-health.timer
 
 ## Components
 
+- `scripts/install.sh` — installs the application and systemd units.
 - `index.html` — test web page.
 - `check-health.sh` — service availability check.
 - `systemd/reliability-web.service` — web service management.
 - `systemd/reliability-health.service` — one-shot health check.
 - `systemd/reliability-health.timer` — periodic health-check scheduler.
 - `docs/runbooks/` — diagnostic and recovery procedures.
+
+## Installation
+
+Clone the repository:
+
+    git clone git@github.com:OchirovAleks/linux-systems-reliability-lab.git
+    cd linux-systems-reliability-lab
+
+Install the application and systemd units:
+
+    sudo ./scripts/install.sh
+
+The installer:
+
+- creates the dedicated `reliability-web` system user;
+- installs the application into `/opt/reliability-web`;
+- installs the systemd units;
+- enables and starts the web service and health-check timer.
 
 ## Service Operations
 
@@ -45,7 +64,7 @@ Read service logs:
 
 Run the health check:
 
-    ./check-health.sh
+    sudo -u reliability-web /opt/reliability-web/check-health.sh
 
 ## Reliability Behavior
 
