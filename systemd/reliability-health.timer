@@ -1,0 +1,11 @@
+[Unit]
+Description=Run reliability web health check every 30 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=1s
+Unit=reliability-health.service
+
+[Install]
+WantedBy=timers.target

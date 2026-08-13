@@ -1,0 +1,15 @@
+[Unit]
+Description=Linux Systems & Reliability Lab web service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/reliability-web
+ExecStart=/usr/bin/python3 -u -m http.server 8080 --bind 0.0.0.0
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
