@@ -1,80 +1,202 @@
 # Linux Systems & Reliability Lab
 
-A hands-on lab for learning Linux, systemd, failure diagnostics, and service monitoring.
+A two-node Linux operations lab for provisioning, monitoring, diagnosing, and
+recovering services across a small server fleet.
 
-## Current Architecture
+The project models the operational workflow used by fleet reliability teams:
 
-Browser on Mac
-→ HTTP port 8080
-→ reliability-web.service
-→ Python HTTP server
-→ index.html
+```text
+provision -> validate -> monitor -> detect -> diagnose -> remediate -> verify
+```
 
-reliability-health.timer
-→ every 30 seconds
-→ reliability-health.service
-→ check-health.sh
-→ HTTP health check
+## Architecture
 
-## Components
+```mermaid
+flowchart TD
+    Mac["macOS / Multipass host"] --> Control["control-node\n192.168.252.2"]
+    Control -->|"Ansible + SSH"| Worker["fleet-node-1\n192.168.252.3"]
+    Control --> Fleetctl["fleetctl operations CLI"]
+    Control --> Monitoring["Prometheus + Alertmanager + Grafana"]
+    Monitoring -->|"Node metrics :9100"| Control
+    Monitoring -->|"Node metrics :9100"| Worker
+    Monitoring -->|"HTTP probes :8080"| Control
+    Monitoring -->|"HTTP probes :8080"| Worker
+```
 
-- `scripts/install.sh` — installs the application and systemd units.
-- `index.html` — test web page.
-- `check-health.sh` — service availability check.
-- `systemd/reliability-web.service` — web service management.
-- `systemd/reliability-health.service` — one-shot health check.
-- `systemd/reliability-health.timer` — periodic health-check scheduler.
-- `docs/runbooks/` — diagnostic and recovery procedures.
+Each node runs:
 
-## Installation
+- a hardened systemd-managed web service;
+- an internal systemd health-check timer;
+- Prometheus Node Exporter;
+- a dedicated unprivileged service account.
 
-Clone the repository:
+The control node additionally runs:
 
-    git clone git@github.com:OchirovAleks/linux-systems-reliability-lab.git
-    cd linux-systems-reliability-lab
+- Ansible for idempotent fleet provisioning;
+- `fleetctl` for health checks, diagnostics, and remediation;
+- Prometheus, Blackbox Exporter, Alertmanager, and Grafana.
 
-Install the application and systemd units:
+## Reliability Features
 
-    sudo ./scripts/install.sh
+- systemd startup and automatic process recovery;
+- dedicated service identity and filesystem permissions;
+- systemd hardening with `NoNewPrivileges`, `ProtectSystem`, and `ProtectHome`;
+- idempotent multi-node Ansible provisioning;
+- concurrent external HTTP and metrics checks;
+- node, CPU, memory, disk, and workload alerts;
+- provisioned Grafana dashboard and Prometheus datasource;
+- remote evidence collection before remediation;
+- explicit confirmation for service-changing fleet operations;
+- runbooks and evidence-based postmortems;
+- automated configuration validation in CI.
 
-The installer:
+## Repository Layout
 
-- creates the dedicated `reliability-web` system user;
-- installs the application into `/opt/reliability-web`;
-- installs the systemd units;
-- enables and starts the web service and health-check timer.
+```text
+ansible/                 Fleet inventory and provisioning playbook
+config/                  fleetctl node inventory
+docs/postmortems/        Completed incident reviews
+docs/runbooks/           Detection, diagnosis, and recovery procedures
+monitoring/              Prometheus, Alertmanager, Blackbox, and Grafana config
+scripts/fleetctl.py      Fleet operations CLI
+scripts/provision-fleet.sh
+scripts/install-monitoring.sh
+scripts/verify-lab.sh
+systemd/                 Web service and health-check units
+```
 
-## Service Operations
+## Lab Requirements
 
-Start the service:
+- macOS with Multipass;
+- approximately 5 GB of available RAM for both VMs;
+- Ubuntu 26.04 LTS ARM64 or AMD64;
+- network access for Ubuntu packages and container images.
 
-    sudo systemctl start reliability-web
+The checked-in inventory uses the following lab addresses:
 
-Stop the service:
+| Node | Address | CPU | Memory | Disk |
+| --- | --- | ---: | ---: | ---: |
+| `control-node` (`reliability-lab`) | `192.168.252.2` | 2 | 4 GB | 30 GB |
+| `fleet-node-1` | `192.168.252.3` | 1 | 1 GB | 8 GB |
 
-    sudo systemctl stop reliability-web
+Update `ansible/inventory.ini`, `config/fleet.json`, and
+`monitoring/prometheus/prometheus.yml` if Multipass assigns different addresses.
 
-Check service status:
+## Provisioning
 
-    systemctl status reliability-web --no-pager
+The control node requires Ansible and a dedicated SSH key that can access the
+worker. The private key must remain outside Git at:
 
-Read service logs:
+```text
+/home/ubuntu/.ssh/fleet_lab_ed25519
+```
 
-    journalctl -u reliability-web -n 20 --no-pager
+From the repository on the control node, validate connectivity:
 
-Run the health check:
+```bash
+ansible -i ansible/inventory.ini fleet -m ping
+```
 
-    sudo -u reliability-web /opt/reliability-web/check-health.sh
+Provision or update all nodes:
 
-## Reliability Behavior
+```bash
+./scripts/provision-fleet.sh
+```
 
-- The service starts automatically after a reboot.
-- systemd restarts the process after an unexpected failure.
-- The health check runs every 30 seconds.
-- `UP` and `DOWN` results are stored in the systemd journal.
+A successful repeated run should report `changed=0`, demonstrating
+idempotency.
 
-## Current Limitations
+## Fleet Operations
 
-- The service and its monitoring run inside the same VM.
-- If the entire VM fails, the internal monitor also stops.
-- Metrics, dashboards, and external notifications are not implemented yet.
+List nodes:
+
+```bash
+./scripts/fleetctl.py inventory
+```
+
+Check web and metrics health concurrently:
+
+```bash
+./scripts/fleetctl.py health
+```
+
+Collect diagnostic evidence:
+
+```bash
+./scripts/fleetctl.py diagnose fleet-node-1
+```
+
+Perform a confirmed service operation:
+
+```bash
+./scripts/fleetctl.py restart fleet-node-1 --yes
+```
+
+## Monitoring
+
+Install and start the monitoring stack on the control node:
+
+```bash
+sudo ./scripts/install-monitoring.sh
+```
+
+The installer generates a local Grafana password in `monitoring/.env` with
+mode `0600`. The file is ignored by Git.
+
+Services are exposed on the control-node address:
+
+| Component | Port |
+| --- | ---: |
+| Grafana | `3000` |
+| Prometheus | `9090` |
+| Alertmanager | `9093` |
+| Blackbox Exporter | `9115` |
+
+The provisioned Grafana dashboard is named **Linux Fleet Overview**.
+
+## Verification
+
+Run the complete operational verification:
+
+```bash
+./scripts/verify-lab.sh
+```
+
+The script verifies:
+
+- both web services;
+- both Node Exporter endpoints;
+- all monitoring readiness endpoints;
+- expected Prometheus target totals;
+- absence of active Prometheus alerts.
+
+## Failure Exercise
+
+Stop only the worker workload:
+
+```bash
+./scripts/fleetctl.py stop fleet-node-1 --yes
+```
+
+Expected behavior:
+
+- worker web health becomes `DOWN`;
+- worker metrics remain `UP`;
+- `FleetWebServiceDown` transitions from `pending` to `firing`;
+- the control-node workload remains healthy.
+
+Recover the worker:
+
+```bash
+./scripts/fleetctl.py start fleet-node-1 --yes
+./scripts/verify-lab.sh
+```
+
+See the [fleet service-down runbook](docs/runbooks/fleet-web-service-down.md)
+and the [completed outage postmortem](docs/postmortems/2026-09-01-fleet-node-1-service-outage.md).
+
+## Current Scope
+
+This lab intentionally focuses on node operations and reliability workflows.
+It does not emulate physical GPU hardware, BMC/IPMI access, InfiniBand, or a
+production Kubernetes cluster. Those are planned as separate extension labs.

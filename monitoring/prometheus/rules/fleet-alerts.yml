@@ -1,0 +1,49 @@
+groups:
+  - name: fleet-availability
+    rules:
+      - alert: FleetNodeDown
+        expr: up{job="node"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fleet node {{ $labels.node }} is unreachable"
+          description: "Prometheus cannot scrape Node Exporter on {{ $labels.instance }}."
+
+      - alert: FleetWebServiceDown
+        expr: probe_success{job="web"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Web service on {{ $labels.node }} is unavailable"
+          description: "The HTTP probe for {{ $labels.instance }} has failed for 30 seconds."
+
+  - name: fleet-capacity
+    rules:
+      - alert: FleetHighCPU
+        expr: 100 - (avg by (instance, node) (rate(node_cpu_seconds_total{job="node",mode="idle"}[2m])) * 100) > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU utilization on {{ $labels.node }}"
+          description: "CPU utilization has exceeded 85 percent for two minutes."
+
+      - alert: FleetHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"})) * 100 > 90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory utilization on {{ $labels.node }}"
+          description: "Available memory has remained below 10 percent for two minutes."
+
+      - alert: FleetLowDiskSpace
+        expr: (node_filesystem_avail_bytes{job="node",mountpoint="/",fstype!=""} / node_filesystem_size_bytes{job="node",mountpoint="/",fstype!=""}) * 100 < 15
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low root filesystem space on {{ $labels.node }}"
+          description: "Free space on the root filesystem is below 15 percent."
