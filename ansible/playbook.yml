@@ -1,0 +1,127 @@
+---
+- name: Provision reliability fleet nodes
+  hosts: fleet
+  become: true
+  gather_facts: true
+
+  vars:
+    reliability_service_user: reliability-web
+    reliability_install_dir: /opt/reliability-web
+
+  tasks:
+    - name: Install node runtime and monitoring packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - prometheus-node-exporter
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create reliability service group
+      ansible.builtin.group:
+        name: "{{ reliability_service_user }}"
+        system: true
+
+    - name: Create reliability service user
+      ansible.builtin.user:
+        name: "{{ reliability_service_user }}"
+        group: "{{ reliability_service_user }}"
+        home: /nonexistent
+        shell: /usr/sbin/nologin
+        system: true
+        create_home: false
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ reliability_install_dir }}"
+        state: directory
+        owner: root
+        group: "{{ reliability_service_user }}"
+        mode: "0750"
+
+    - name: Install web page
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../index.html"
+        dest: "{{ reliability_install_dir }}/index.html"
+        owner: root
+        group: "{{ reliability_service_user }}"
+        mode: "0640"
+      notify: Restart reliability web
+
+    - name: Install health-check script
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../check-health.sh"
+        dest: "{{ reliability_install_dir }}/check-health.sh"
+        owner: root
+        group: "{{ reliability_service_user }}"
+        mode: "0750"
+      notify: Restart reliability health timer
+
+    - name: Install systemd units
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../systemd/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - reliability-web.service
+        - reliability-health.service
+        - reliability-health.timer
+      notify:
+        - Restart reliability web
+        - Restart reliability health timer
+
+    - name: Enable and start reliability web
+      ansible.builtin.systemd_service:
+        name: reliability-web.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Enable and start reliability health timer
+      ansible.builtin.systemd_service:
+        name: reliability-health.timer
+        enabled: true
+        state: started
+
+    - name: Enable and start Prometheus Node Exporter
+      ansible.builtin.systemd_service:
+        name: prometheus-node-exporter.service
+        enabled: true
+        state: started
+
+    - name: Apply pending service restarts before verification
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify local web endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/
+        method: GET
+        status_code: 200
+        return_content: false
+      register: reliability_web_check
+      retries: 5
+      delay: 2
+      until: reliability_web_check.status == 200
+
+    - name: Verify local Node Exporter endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9100/metrics
+        method: GET
+        status_code: 200
+        return_content: false
+
+  handlers:
+    - name: Restart reliability web
+      ansible.builtin.systemd_service:
+        name: reliability-web.service
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart reliability health timer
+      ansible.builtin.systemd_service:
+        name: reliability-health.timer
+        state: restarted
+        daemon_reload: true

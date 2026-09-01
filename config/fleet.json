@@ -1,0 +1,17 @@
+{
+  "service_port": 8080,
+  "metrics_port": 9100,
+  "nodes": [
+    {
+      "name": "control-node",
+      "host": "192.168.252.2",
+      "local": true
+    },
+    {
+      "name": "fleet-node-1",
+      "host": "192.168.252.3",
+      "ssh_user": "ubuntu",
+      "ssh_key": "/home/ubuntu/.ssh/fleet_lab_ed25519"
+    }
+  ]
+}
