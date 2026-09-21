@@ -19,6 +19,23 @@ groups:
           summary: "Web service on {{ $labels.node }} is unavailable"
           description: "The HTTP probe for {{ $labels.instance }} has failed for 30 seconds."
 
+      - alert: FleetClockUnsynchronized
+        expr: node_timex_sync_status{job="node"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clock synchronization lost on {{ $labels.node }}"
+          description: "The kernel reports that the system clock is not synchronized."
+
+      - alert: FleetClockDrift
+        expr: abs(time() - node_time_seconds{job="node"}) > 30
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clock drift detected on {{ $labels.node }}"
+          description: "The node clock differs from Prometheus by more than 30 seconds."
   - name: fleet-capacity
     rules:
       - alert: FleetHighCPU

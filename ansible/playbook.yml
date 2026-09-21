@@ -13,10 +13,19 @@
       ansible.builtin.apt:
         name:
           - curl
+          - chrony
           - prometheus-node-exporter
         state: present
         update_cache: true
         cache_valid_time: 3600
+
+    - name: Allow large clock corrections after VM resume
+      ansible.builtin.lineinfile:
+        path: /etc/chrony/chrony.conf
+        regexp: '^\s*makestep\s+'
+        line: 'makestep 30 -1'
+        backup: true
+      notify: Restart chrony
 
     - name: Create reliability service group
       ansible.builtin.group:
@@ -125,3 +134,8 @@
         name: reliability-health.timer
         state: restarted
         daemon_reload: true
+
+    - name: Restart chrony
+      ansible.builtin.systemd_service:
+        name: chrony.service
+        state: restarted
