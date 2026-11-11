@@ -14,8 +14,13 @@ fi
 "${KUBECTL[@]}" apply -f "$PROJECT_DIR/kubernetes/deployment.yaml"
 "${KUBECTL[@]}" apply -f "$PROJECT_DIR/kubernetes/service.yaml"
 "${KUBECTL[@]}" apply -f "$PROJECT_DIR/kubernetes/pod-disruption-budget.yaml"
+"${KUBECTL[@]}" apply -f \
+    "$PROJECT_DIR/kubernetes/observability/kube-state-metrics.yaml"
+"${KUBECTL[@]}" apply -f "$PROJECT_DIR/kubernetes/training/namespace.yaml"
 
 "${KUBECTL[@]}" -n reliability-lab rollout status \
     deployment/reliability-web --timeout=180s
+"${KUBECTL[@]}" -n kube-system rollout status \
+    deployment/kube-state-metrics --timeout=180s
 "${KUBECTL[@]}" -n reliability-lab get pods -o wide
 "${KUBECTL[@]}" -n reliability-lab get service reliability-web

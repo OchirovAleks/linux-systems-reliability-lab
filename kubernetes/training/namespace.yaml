@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reliability-training
+  labels:
+    app.kubernetes.io/part-of: linux-systems-reliability-lab
+    app.kubernetes.io/purpose: incident-training
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

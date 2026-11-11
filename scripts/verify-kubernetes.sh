@@ -69,5 +69,25 @@ fi
 
 echo "Prometheus Kubernetes HTTP probes: $kubernetes_web_count"
 
+curl --fail --silent --show-error --output /dev/null \
+    --connect-timeout 2 --max-time 5 \
+    http://192.168.252.2:30081/metrics
+echo "UP: http://192.168.252.2:30081/metrics"
+
+kubernetes_ready_nodes="$(
+    curl --fail --silent --show-error \
+        --get \
+        --data-urlencode 'query=sum(kube_node_status_condition{condition="Ready",status="true"})' \
+        http://127.0.0.1:9090/api/v1/query \
+        | python3 -c 'import json,sys; result=json.load(sys.stdin)["data"]["result"]; print(result[0]["value"][1] if result else "missing")'
+)"
+
+if [[ "$kubernetes_ready_nodes" != "2" ]]; then
+    echo "Unexpected Kubernetes Ready node total: $kubernetes_ready_nodes" >&2
+    exit 1
+fi
+
+echo "Prometheus Kubernetes Ready nodes: $kubernetes_ready_nodes"
+
 "${KUBECTL[@]}" -n "$NAMESPACE" get deployment,pods,service,poddisruptionbudget -o wide
 echo "Kubernetes lab verification passed."

@@ -56,11 +56,13 @@ application Pods across the two nodes.
 - remote evidence collection before remediation;
 - explicit confirmation for service-changing fleet operations;
 - runbooks and evidence-based postmortems;
-- automated configuration validation in CI.
+- automated configuration validation in CI;
 - a two-node K3s cluster with topology-aware Pod placement;
 - Kubernetes startup, readiness, and liveness probes;
 - non-root containers with resource limits and restricted security contexts;
-- a PodDisruptionBudget and rolling-update strategy.
+- a PodDisruptionBudget and rolling-update strategy;
+- an isolated Kubernetes incident trainer with metrics, alerts, and recovery
+  workflows.
 
 ## Repository Layout
 
@@ -71,12 +73,14 @@ container/               Container image for the Kubernetes workload
 config/                  fleetctl node inventory
 docs/postmortems/        Completed incident reviews
 docs/runbooks/           Detection, diagnosis, and recovery procedures
+docs/training/           Guided reliability exercises
 monitoring/              Prometheus, Alertmanager, Blackbox, and Grafana config
-kubernetes/              Deployment, Service, namespace, and disruption budget
+kubernetes/              Production-like workload, observability, and training scenarios
 scripts/install.sh       Standalone single-node service installer
 scripts/fleetctl.py      Fleet operations CLI
 scripts/provision-fleet.sh
 scripts/install-monitoring.sh
+scripts/k8s-trainer.sh   Incident scenario and recovery controller
 scripts/verify-lab.sh
 systemd/                 Web service and health-check units
 tests/                   Python unit tests for fleetctl
@@ -176,6 +180,10 @@ http://192.168.252.2:30080/
 http://192.168.252.3:30080/
 ```
 
+Kube-state-metrics exposes Kubernetes object state to Prometheus through the
+control node on port `30081`. It is installed with limited, read-only RBAC and
+is used by the Kubernetes reliability alerts and training dashboard.
+
 The image uses `imagePullPolicy: Never` intentionally. This makes local image
 distribution observable and avoids requiring credentials for an external
 container registry. Re-run the image build/import script on both nodes before
@@ -232,8 +240,10 @@ Services are exposed on the control-node address:
 | Prometheus | `9090` | `http://192.168.252.2:9090` |
 | Alertmanager | `9093` | `http://192.168.252.2:9093` |
 | Blackbox Exporter | `9115` | `http://192.168.252.2:9115` |
+| Kube-state-metrics | `30081` | `http://192.168.252.2:30081/metrics` |
 
-The provisioned Grafana dashboard is named **Linux Fleet Overview**.
+The provisioned Grafana dashboards are named **Linux Fleet Overview** and
+**Kubernetes Reliability Trainer**.
 
 ### Alert Rules
 
@@ -247,6 +257,44 @@ The provisioned Grafana dashboard is named **Linux Fleet Overview**.
 | `FleetHighCPU` | CPU utilization is above 85% | 2 minutes |
 | `FleetHighMemory` | Memory utilization is above 90% | 2 minutes |
 | `FleetLowDiskSpace` | Root filesystem free space is below 15% | 2 minutes |
+| `KubernetesNodeNotReady` | A Kubernetes node is not Ready | 1 minute |
+| `KubernetesDeploymentReplicasMismatch` | Available replicas are below desired replicas | 45 seconds |
+| `KubernetesPodCrashLooping` | A training Pod remains in CrashLoopBackOff | 30 seconds |
+| `KubernetesContainerOOMKilled` | A training container exceeds its memory limit | Immediate |
+| `KubernetesPodUnschedulable` | The scheduler cannot place a training Pod | 30 seconds |
+
+## Kubernetes Reliability Trainer
+
+The trainer creates controlled failures in the isolated
+`reliability-training` namespace. The main workload remains in
+`reliability-lab` and continues serving traffic during application-level
+exercises.
+
+List the available scenarios:
+
+```bash
+./scripts/k8s-trainer.sh list
+```
+
+Start an incident, investigate it, and recover it:
+
+```bash
+./scripts/k8s-trainer.sh start crashloop --yes
+./scripts/k8s-trainer.sh status
+./scripts/k8s-trainer.sh evidence crashloop
+./scripts/k8s-trainer.sh recover crashloop --yes
+```
+
+Reset every training resource and restore the worker agent:
+
+```bash
+./scripts/k8s-trainer.sh reset --yes
+```
+
+The available exercises cover `CrashLoopBackOff`, `OOMKilled`, scheduling
+failure, readiness failure, missing images, and a `NotReady` worker node. Work
+through them one at a time using
+[`docs/training/kubernetes-reliability.md`](docs/training/kubernetes-reliability.md).
 
 ## Verification
 

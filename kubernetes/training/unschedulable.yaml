@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unschedulable
+  namespace: reliability-training
+  labels:
+    app.kubernetes.io/name: unschedulable
+    reliability-lab/scenario: unschedulable
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unschedulable
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: unschedulable
+        reliability-lab/scenario: unschedulable
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: unschedulable
+          image: reliability-web:0.1.0
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: "64"
+              memory: 64Gi
+            limits:
+              cpu: "64"
+              memory: 64Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

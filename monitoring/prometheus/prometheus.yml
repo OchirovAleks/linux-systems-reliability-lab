@@ -75,3 +75,8 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets:
+          - 192.168.252.2:30081

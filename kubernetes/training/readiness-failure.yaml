@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: readiness-failure
+  namespace: reliability-training
+  labels:
+    app.kubernetes.io/name: readiness-failure
+    reliability-lab/scenario: readiness-failure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: readiness-failure
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: readiness-failure
+        reliability-lab/scenario: readiness-failure
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: reliability-lab
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: readiness-failure
+          image: reliability-web:0.1.0
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /missing-health-endpoint
+              port: http
+            periodSeconds: 3
+            timeoutSeconds: 1
+            failureThreshold: 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

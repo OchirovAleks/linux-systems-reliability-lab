@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crashloop
+  namespace: reliability-training
+  labels:
+    app.kubernetes.io/name: crashloop
+    reliability-lab/scenario: crashloop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: crashloop
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: crashloop
+        reliability-lab/scenario: crashloop
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: reliability-lab
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: crashloop
+          image: reliability-web:0.1.0
+          imagePullPolicy: Never
+          command:
+            - /bin/sh
+            - -c
+            - echo "simulated application crash" >&2; exit 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

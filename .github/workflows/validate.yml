@@ -44,14 +44,15 @@ jobs:
 
           root = pathlib.Path('.')
           for path in root.glob('monitoring/**/*.yml'):
-              yaml.safe_load(path.read_text())
+              list(yaml.safe_load_all(path.read_text()))
           for path in root.glob('ansible/**/*.yml'):
-              yaml.safe_load(path.read_text())
+              list(yaml.safe_load_all(path.read_text()))
           for path in root.glob('kubernetes/**/*.yaml'):
-              yaml.safe_load(path.read_text())
-          yaml.safe_load((root / 'monitoring/compose.yaml').read_text())
+              list(yaml.safe_load_all(path.read_text()))
+          list(yaml.safe_load_all((root / 'monitoring/compose.yaml').read_text()))
           json.loads((root / 'config/fleet.json').read_text())
-          json.loads((root / 'monitoring/grafana/dashboards/fleet-overview.json').read_text())
+          for path in root.glob('monitoring/grafana/dashboards/*.json'):
+              json.loads(path.read_text())
           PY
 
       - name: Validate Ansible playbook
