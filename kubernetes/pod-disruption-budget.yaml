@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reliability-web
+  namespace: reliability-lab
+  labels:
+    app.kubernetes.io/name: reliability-web
+    app.kubernetes.io/part-of: linux-systems-reliability-lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reliability-web

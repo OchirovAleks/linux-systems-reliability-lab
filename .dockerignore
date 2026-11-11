@@ -1,0 +1,13 @@
+.git
+.github
+.env
+**/.env
+**/__pycache__
+*.pyc
+ansible
+config
+docs
+monitoring
+scripts
+systemd
+tests

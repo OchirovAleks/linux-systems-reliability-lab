@@ -19,6 +19,15 @@ groups:
           summary: "Web service on {{ $labels.node }} is unavailable"
           description: "The HTTP probe for {{ $labels.instance }} has failed for 30 seconds."
 
+      - alert: KubernetesWebServiceDown
+        expr: probe_success{job="kubernetes-web"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes web endpoint on {{ $labels.node }} is unavailable"
+          description: "The NodePort HTTP probe for {{ $labels.instance }} has failed for 30 seconds."
+
       - alert: FleetClockUnsynchronized
         expr: node_timex_sync_status{job="node"} == 0
         for: 2m

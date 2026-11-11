@@ -1,0 +1,104 @@
+---
+- name: Install K3s control plane
+  hosts: control-node
+  become: true
+  gather_facts: true
+
+  vars:
+    k3s_install_script: /usr/local/src/install-k3s.sh
+    k3s_server_ip: 192.168.252.2
+
+  tasks:
+    - name: Download official K3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: "{{ k3s_install_script }}"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install K3s server
+      ansible.builtin.command:
+        cmd: "{{ k3s_install_script }}"
+        creates: /etc/systemd/system/k3s.service
+      environment:
+        INSTALL_K3S_CHANNEL: stable
+        INSTALL_K3S_EXEC: >-
+          server
+          --node-ip {{ k3s_server_ip }}
+          --advertise-address {{ k3s_server_ip }}
+          --write-kubeconfig-mode 0644
+          --disable traefik
+          --disable servicelb
+
+    - name: Wait for control-plane node readiness
+      ansible.builtin.command:
+        cmd: k3s kubectl wait --for=condition=Ready node/reliability-lab --timeout=180s
+      changed_when: false
+
+    - name: Read K3s node token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_node_token
+      no_log: true
+
+    - name: Store K3s token for the agent play
+      ansible.builtin.set_fact:
+        k3s_join_token: "{{ k3s_node_token.content | b64decode | trim }}"
+      no_log: true
+
+- name: Join K3s worker nodes
+  hosts: fleet-node-1
+  become: true
+  gather_facts: true
+
+  vars:
+    k3s_install_script: /usr/local/src/install-k3s.sh
+    k3s_server_ip: 192.168.252.2
+
+  tasks:
+    - name: Download official K3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: "{{ k3s_install_script }}"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install K3s agent
+      ansible.builtin.command:
+        cmd: "{{ k3s_install_script }}"
+        creates: /etc/systemd/system/k3s-agent.service
+      environment:
+        INSTALL_K3S_CHANNEL: stable
+        K3S_URL: "https://{{ k3s_server_ip }}:6443"
+        K3S_TOKEN: "{{ hostvars['control-node']['k3s_join_token'] }}"
+        INSTALL_K3S_EXEC: "agent --node-ip {{ ansible_host }}"
+      no_log: true
+
+    - name: Ensure K3s agent is enabled and running
+      ansible.builtin.systemd_service:
+        name: k3s-agent.service
+        enabled: true
+        state: started
+
+- name: Verify the two-node cluster
+  hosts: control-node
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait for worker node readiness
+      ansible.builtin.command:
+        cmd: k3s kubectl wait --for=condition=Ready node/fleet-node-1 --timeout=180s
+      changed_when: false
+
+    - name: Display cluster nodes
+      ansible.builtin.command:
+        cmd: k3s kubectl get nodes -o wide
+      changed_when: false
+      register: k3s_nodes
+
+    - name: Show cluster node status
+      ansible.builtin.debug:
+        var: k3s_nodes.stdout_lines

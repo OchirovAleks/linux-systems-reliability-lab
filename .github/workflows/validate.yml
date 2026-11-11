@@ -45,13 +45,22 @@ jobs:
           root = pathlib.Path('.')
           for path in root.glob('monitoring/**/*.yml'):
               yaml.safe_load(path.read_text())
+          for path in root.glob('ansible/**/*.yml'):
+              yaml.safe_load(path.read_text())
+          for path in root.glob('kubernetes/**/*.yaml'):
+              yaml.safe_load(path.read_text())
           yaml.safe_load((root / 'monitoring/compose.yaml').read_text())
           json.loads((root / 'config/fleet.json').read_text())
           json.loads((root / 'monitoring/grafana/dashboards/fleet-overview.json').read_text())
           PY
 
       - name: Validate Ansible playbook
-        run: ansible-playbook -i ansible/inventory.ini ansible/playbook.yml --syntax-check
+        run: |
+          ansible-playbook -i ansible/inventory.ini ansible/playbook.yml --syntax-check
+          ansible-playbook -i ansible/inventory.ini ansible/k3s.yml --syntax-check
+
+      - name: Build Kubernetes workload image
+        run: docker build --file container/Dockerfile --tag reliability-web:ci .
 
       - name: Validate Docker Compose
         env:
